@@ -1,7 +1,18 @@
 #include <vector>
+#include <cstring>
 #include <cassert>
 #include <iostream>
 #include <vulkan/vulkan.h>
+#include <shaderc/shaderc.h>
+
+// compile compute shader
+shaderc_compilation_result_t CompileComputeShader(shaderc_compiler_t compiler, std::string_view source) {
+    shaderc_compilation_result_t result = shaderc_compile_into_spv(compiler, source.data(), source.size(), shaderc_glsl_default_compute_shader, "Compute shader", "main", nullptr);
+    if (shaderc_result_get_compilation_status(result) == shaderc_compilation_status_success) return result;
+    std::cout << "Shader compiler: " << shaderc_result_get_error_message(result) << std::endl;
+    shaderc_result_release(result);
+    return nullptr;
+}
 
 int main(int argc, char** argv) {
     // vulkan extensions
@@ -118,12 +129,12 @@ int main(int argc, char** argv) {
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &deviceQueueFamilyPropertiesCount, deviceQueueFamilyProperties.data());
         for (const VkQueueFamilyProperties& queueFamilyProperty: deviceQueueFamilyProperties) {
             std::cout << "\t";
-            std::cout << "VK_QUEUE_GRAPHICS_BIT: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT) ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_COMPUTE_BIT: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT) ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_TRANSFER_BIT: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_TRANSFER_BIT) ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_SPARSE_BINDING_BIT: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) ? "True, " : "False,") << " ";
+            std::cout << "VK_QUEUE_GRAPHICS_BIT: "         << ((queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT)         ? "True, " : "False,") << " ";
+            std::cout << "VK_QUEUE_COMPUTE_BIT: "          << ((queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT)          ? "True, " : "False,") << " ";
+            std::cout << "VK_QUEUE_TRANSFER_BIT: "         << ((queueFamilyProperty.queueFlags & VK_QUEUE_TRANSFER_BIT)         ? "True, " : "False,") << " ";
+            std::cout << "VK_QUEUE_SPARSE_BINDING_BIT: "   << ((queueFamilyProperty.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)   ? "True, " : "False,") << " ";
             std::cout << "VK_QUEUE_VIDEO_DECODE_BIT_KHR: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR) ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_VIDEO_ENCODE_BIT_KHR: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR) ? "True, " : "False,") << std::endl;
+            std::cout << "VK_QUEUE_VIDEO_ENCODE_BIT_KHR: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR) ? "True  " : "False ") << std::endl;
         }
     }
 
@@ -155,8 +166,62 @@ int main(int argc, char** argv) {
     // create device
     VkDevice device{};
     vkCreateDevice(physicalDevices[0], &deviceCreateInfo, VK_NULL_HANDLE, &device);
+    assert(device);
+
+    // get device queue
+    VkQueue queue{};
+    vkGetDeviceQueue(device, 0, 0, &queue);
+    assert(queue);
+
+    // create shader compiler
+    shaderc_compiler_t shadercCompiler{};
+    shadercCompiler = shaderc_compiler_initialize();
+    assert(shadercCompiler);
+
+    // compile shader
+    shaderc_compilation_result_t computeShaderData{};
+    computeShaderData = CompileComputeShader(shadercCompiler, "#version 450\n void main() {}");
+    assert(computeShaderData);
+    // shader module create info
+    VkShaderModuleCreateInfo computeShaderModuleCreateInfo{};
+    computeShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    computeShaderModuleCreateInfo.pNext = VK_NULL_HANDLE;
+    computeShaderModuleCreateInfo.flags = 0;
+    computeShaderModuleCreateInfo.codeSize = shaderc_result_get_length(computeShaderData);
+    computeShaderModuleCreateInfo.pCode = (uint32_t *)shaderc_result_get_bytes(computeShaderData);
+    // create shader module
+    VkShaderModule computeShaderModule{}; 
+    vkCreateShaderModule(device, &computeShaderModuleCreateInfo, VK_NULL_HANDLE, &computeShaderModule);
+    assert(computeShaderModule);
+    // pipeline shader stage create info
+    VkPipelineShaderStageCreateInfo computeShaderStageCreateInfo{};
+    computeShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    computeShaderStageCreateInfo.pNext = VK_NULL_HANDLE;
+    computeShaderStageCreateInfo.flags = 0;
+    computeShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    computeShaderStageCreateInfo.module = computeShaderModule;
+    computeShaderStageCreateInfo.pName = "main";
+    computeShaderStageCreateInfo.pSpecializationInfo = VK_NULL_HANDLE;
+
+    // compute pipeline create info
+    VkComputePipelineCreateInfo pipelineCreateInfo{};
+    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineCreateInfo.pNext = VK_NULL_HANDLE;
+    pipelineCreateInfo.flags = 0;
+    pipelineCreateInfo.stage = computeShaderStageCreateInfo;
+    pipelineCreateInfo.layout; // must be done
+    pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineCreateInfo.basePipelineIndex = 0;
+    // create compute pipeline
+    VkPipeline computePipeline;
+    vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, VK_NULL_HANDLE, &computePipeline);
+    assert(computePipeline);
 
     // destroy handles
+    vkDestroyPipeline(device, computePipeline, VK_NULL_HANDLE);
+    vkDestroyShaderModule(device, computeShaderModule, VK_NULL_HANDLE);
+    shaderc_result_release(computeShaderData);
+    shaderc_compiler_release(shadercCompiler);
     vkDestroyDevice(device, VK_NULL_HANDLE);
     auto fnDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (fnDestroyDebugUtilsMessengerEXT)

@@ -20,7 +20,7 @@ APP_INCLUDES =                      \
 # app linking
 APP_LD        = g++
 APP_LDFLAGS   = -mconsole
-APP_LIBRARIES = -L ./lib/x64 -l vulkan-1 -l shaderc
+APP_LIBRARIES = -L ./lib/x64 -l vulkan-1 -l shaderc_shared
 # targets
 APP_TARGET_PATH = .bin
 APP_TARGET_NAME = $(APP_TARGET_PATH)/cpp-vulkan-compute.exe
