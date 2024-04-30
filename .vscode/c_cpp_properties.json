@@ -10,7 +10,8 @@
                 "./include"
             ],
             "defines": [
-                "_DEBUG"
+                "_DEBUG",
+                "VMA_IMPLEMENTATION"
             ]
         }
     ],

@@ -2,7 +2,7 @@
 #include <cstring>
 #include <cassert>
 #include <iostream>
-#include <vma/vk_mem_alloc.h>
+#include <vma/VmaUsage.h>
 #include <shaderc/shaderc.h>
 
 // compute shader image write
@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
         fnCreateDebugUtilsMessengerEXT(instance, &messengerCreateInfo, VK_NULL_HANDLE, &debugUtilsMessengerEXT);
 
     // physical device features
+    uint32_t queueFamilyIndex = 0;
     VkPhysicalDeviceFeatures physicalDeviceFeatures{};
     physicalDeviceFeatures.shaderInt16 = VK_TRUE;
     physicalDeviceFeatures.shaderInt64 = VK_TRUE;
@@ -110,7 +111,7 @@ int main(int argc, char** argv) {
     deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     deviceQueueCreateInfo.pNext = VK_NULL_HANDLE;
     deviceQueueCreateInfo.flags = 0;
-    deviceQueueCreateInfo.queueFamilyIndex = 0;
+    deviceQueueCreateInfo.queueFamilyIndex = queueFamilyIndex;
     deviceQueueCreateInfo.queueCount = 1;
     deviceQueueCreateInfo.pQueuePriorities = &queuePriorities;
     // device create info
@@ -129,6 +130,21 @@ int main(int argc, char** argv) {
     VkDevice device{};
     vkCreateDevice(physicalDevices[0], &deviceCreateInfo, VK_NULL_HANDLE, &device);
     assert(device);
+
+    // allocator create info
+    VmaAllocatorCreateInfo allocatorCreateInfo{};
+    allocatorCreateInfo.flags = 0;
+    allocatorCreateInfo.physicalDevice = physicalDevices[0];
+    allocatorCreateInfo.device = device;
+    allocatorCreateInfo.preferredLargeHeapBlockSize = 0;
+    allocatorCreateInfo.pAllocationCallbacks = VK_NULL_HANDLE;
+    allocatorCreateInfo.pDeviceMemoryCallbacks = VK_NULL_HANDLE;
+    allocatorCreateInfo.pHeapSizeLimit = VK_NULL_HANDLE;
+    allocatorCreateInfo.instance = instance;
+    allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+    VmaAllocator alloactor{};
+    vmaCreateAllocator(&allocatorCreateInfo, &alloactor);
+    assert(alloactor);
 
     // get device queue
     VkQueue queue{};
@@ -181,7 +197,6 @@ int main(int argc, char** argv) {
     VkDescriptorSetLayout descSetLayout{};
     vkCreateDescriptorSetLayout(device, &descSetLayoutCreateInfo, VK_NULL_HANDLE, &descSetLayout);
     assert(descSetLayout);
-
     // pipeline layout create info
     VkDescriptorSetLayout descSetLayouts[] { descSetLayout };
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
@@ -211,6 +226,32 @@ int main(int argc, char** argv) {
     vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, VK_NULL_HANDLE, &computePipeline);
     assert(computePipeline);
 
+    // buffer create info
+    VkBufferCreateInfo bufferCreateInfo{};
+    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCreateInfo.pNext = VK_NULL_HANDLE;
+    bufferCreateInfo.flags = 0;
+    bufferCreateInfo.size = 512;
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferCreateInfo.queueFamilyIndexCount = 1;
+    bufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;
+    VmaAllocationCreateInfo allocationCreateInfo{};
+    allocationCreateInfo.flags = 0;
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocationCreateInfo.requiredFlags = 0;
+    allocationCreateInfo.preferredFlags = 0;
+    allocationCreateInfo.memoryTypeBits = 0;
+    allocationCreateInfo.pool = VK_NULL_HANDLE;
+    allocationCreateInfo.pUserData = VK_NULL_HANDLE;
+    allocationCreateInfo.priority = 1.0f;
+    // allocate and create buffer
+    VkBuffer buffer{};
+    VmaAllocation bufferAllocation{};
+    vmaCreateBuffer(alloactor, &bufferCreateInfo, &allocationCreateInfo, &buffer, &bufferAllocation, VK_NULL_HANDLE);
+    assert(buffer);
+    assert(bufferAllocation);
+
     // command pool create info
     VkCommandPoolCreateInfo commandPoolCreateInfo{};
     commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -221,7 +262,6 @@ int main(int argc, char** argv) {
     VkCommandPool commandPool{};
     vkCreateCommandPool(device, &commandPoolCreateInfo, VK_NULL_HANDLE, &commandPool);
     assert(commandPool);
-
     // command buffer allocate info
     VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
     commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -268,6 +308,9 @@ int main(int argc, char** argv) {
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     vkDestroyCommandPool(device, commandPool, VK_NULL_HANDLE);
 
+    // destroy resource
+    vmaDestroyBuffer(alloactor, buffer, bufferAllocation);
+
     // destroy handles
     vkDestroyPipeline(device, computePipeline, VK_NULL_HANDLE);
     vkDestroyPipelineLayout(device, pipelineLayout, VK_NULL_HANDLE);
@@ -275,6 +318,7 @@ int main(int argc, char** argv) {
     vkDestroyShaderModule(device, computeShaderModule, VK_NULL_HANDLE);
     shaderc_result_release(computeShaderData);
     shaderc_compiler_release(shadercCompiler);
+    vmaDestroyAllocator(alloactor);
     vkDestroyDevice(device, VK_NULL_HANDLE);
     auto fnDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (fnDestroyDebugUtilsMessengerEXT)

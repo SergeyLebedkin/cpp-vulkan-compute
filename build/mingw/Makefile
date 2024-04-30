@@ -14,7 +14,8 @@ APP_CXX      = g++
 APP_CXXFLAGS = -g -Wall -std=c++17
 APP_ASMFLAGS = -masm=intel -Wall -std=c++17
 APP_DEFINES  =                      \
-    -D _DEBUG
+    -D _DEBUG                       \
+	-D VMA_IMPLEMENTATION
 APP_INCLUDES =                      \
     -I ./include
 # app linking
