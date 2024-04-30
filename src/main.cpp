@@ -2,7 +2,7 @@
 #include <cstring>
 #include <cassert>
 #include <iostream>
-#include <vulkan/vulkan.h>
+#include <vma/vk_mem_alloc.h>
 #include <shaderc/shaderc.h>
 
 // compile compute shader
