@@ -5,6 +5,18 @@
 #include <vma/vk_mem_alloc.h>
 #include <shaderc/shaderc.h>
 
+// compute shader image write
+const char* computeShader_ImageWrite = R"(
+    #version 450
+    struct SolidColor { vec4 color; };
+    layout(set = 0, binding = 0, rgba8ui) uniform readonly  uimage2D inputImage;
+    layout(set = 0, binding = 1, rgba8ui) uniform writeonly uimage2D outputImage;
+    layout(set = 0, binding = 2, std140)  uniform ubo2 { SolidColor uSolidColor0; };
+    void main() {
+        return;
+    }
+)";
+
 // compile compute shader
 shaderc_compilation_result_t CompileComputeShader(shaderc_compiler_t compiler, std::string_view source) {
     shaderc_compilation_result_t result = shaderc_compile_into_spv(compiler, source.data(), source.size(), shaderc_glsl_default_compute_shader, "Compute shader", "main", nullptr);
@@ -127,7 +139,7 @@ int main(int argc, char** argv) {
 
     // compile shader
     shaderc_compilation_result_t computeShaderData{};
-    computeShaderData = CompileComputeShader(shadercCompiler, "#version 450\n uniform layout(set = 0, binding = 0, rgba8ui) readonly  uimage2D inputImage; uniform layout(set = 0, binding = 1, rgba8ui) writeonly uimage2D outputImage; void main() {}");
+    computeShaderData = CompileComputeShader(shadercCompiler, computeShader_ImageWrite);
     assert(computeShaderData);
     // shader module create info
     VkShaderModuleCreateInfo computeShaderModuleCreateInfo{};
@@ -151,15 +163,16 @@ int main(int argc, char** argv) {
     computeShaderStageCreateInfo.pSpecializationInfo = VK_NULL_HANDLE;
 
     // descriptor set layout binding
-    VkDescriptorSetLayoutBinding inputImage  { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, 0, VK_NULL_HANDLE };
-    VkDescriptorSetLayoutBinding outputImage { 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, 0, VK_NULL_HANDLE };
+    VkDescriptorSetLayoutBinding inputImage  { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  1, VK_SHADER_STAGE_ALL, VK_NULL_HANDLE };
+    VkDescriptorSetLayoutBinding outputImage { 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  1, VK_SHADER_STAGE_ALL, VK_NULL_HANDLE };
+    VkDescriptorSetLayoutBinding solidColor  { 2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, VK_NULL_HANDLE };
     // descriptor set layout create info
-    VkDescriptorSetLayoutBinding descSetLayoutBindings[] = { inputImage, outputImage };
+    VkDescriptorSetLayoutBinding descSetLayoutBindings[] = { inputImage, outputImage, solidColor };
     VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo{};
     descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descSetLayoutCreateInfo.pNext = VK_NULL_HANDLE;
     descSetLayoutCreateInfo.flags = 0;
-    descSetLayoutCreateInfo.bindingCount = 2;
+    descSetLayoutCreateInfo.bindingCount = 3;
     descSetLayoutCreateInfo.pBindings = descSetLayoutBindings;
     // create descriptor set layout
     VkDescriptorSetLayout descSetLayout{};
@@ -231,7 +244,7 @@ int main(int argc, char** argv) {
     vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
     //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 0, 0, 0, 0);
-    vkCmdDispatch(commandBuffer, 64, 64, 1);
+    //vkCmdDispatch(commandBuffer, 64, 64, 1);
     vkEndCommandBuffer(commandBuffer);
 
     // queue submit and wait
