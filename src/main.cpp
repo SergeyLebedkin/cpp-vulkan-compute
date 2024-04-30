@@ -85,59 +85,6 @@ int main(int argc, char** argv) {
     if (fnCreateDebugUtilsMessengerEXT != nullptr)
         fnCreateDebugUtilsMessengerEXT(instance, &messengerCreateInfo, VK_NULL_HANDLE, &debugUtilsMessengerEXT);
 
-    // get vulkan instance layer properties
-    uint32_t instanceLayerPropertiesCount{};
-    vkEnumerateInstanceLayerProperties(&instanceLayerPropertiesCount, VK_NULL_HANDLE);
-    std::vector<VkLayerProperties> instanceLayerProperties(instanceLayerPropertiesCount);
-    vkEnumerateInstanceLayerProperties(&instanceLayerPropertiesCount, instanceLayerProperties.data());
-    for (const VkLayerProperties& layerProperty: instanceLayerProperties)
-        std::cout << "\t" << layerProperty.layerName << ": " << layerProperty.description << std::endl;
-
-    // get physical devices layer properties
-    uint32_t instanceExtensionPropertiesCount{};
-    vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &instanceExtensionPropertiesCount, VK_NULL_HANDLE);
-    std::vector<VkExtensionProperties> instanceExtensionProperties(instanceExtensionPropertiesCount);
-    vkEnumerateInstanceExtensionProperties(VK_NULL_HANDLE, &instanceExtensionPropertiesCount, instanceExtensionProperties.data());
-    for (const VkExtensionProperties& extensionProperty: instanceExtensionProperties)
-        std::cout << "\t" << extensionProperty.extensionName << ": " << extensionProperty.specVersion << std::endl;
-
-    for (const VkPhysicalDevice& physicalDevice: physicalDevices) {
-        VkPhysicalDeviceProperties physicalDeviceProperties{};
-        vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
-        std::cout << physicalDeviceProperties.deviceName << std::endl;
-        
-        // get physical devices layer properties
-        uint32_t deviceLayerPropertiesCount{};
-        vkEnumerateDeviceLayerProperties(physicalDevice, &deviceLayerPropertiesCount, VK_NULL_HANDLE);
-        std::vector<VkLayerProperties> deviceLayerProperties(deviceLayerPropertiesCount);
-        vkEnumerateDeviceLayerProperties(physicalDevice, &deviceLayerPropertiesCount, deviceLayerProperties.data());
-        for (const VkLayerProperties& layerProperty: deviceLayerProperties)
-            std::cout << "\t" << layerProperty.layerName << ": " << layerProperty.description << std::endl;
-
-        // get physical devices layer properties
-        uint32_t deviceExtensionPropertiesCount{};
-        vkEnumerateDeviceExtensionProperties(physicalDevice, VK_NULL_HANDLE, &deviceExtensionPropertiesCount, VK_NULL_HANDLE);
-        std::vector<VkExtensionProperties> deviceExtensionProperties(deviceExtensionPropertiesCount);
-        vkEnumerateDeviceExtensionProperties(physicalDevice, VK_NULL_HANDLE, &deviceExtensionPropertiesCount, deviceExtensionProperties.data());
-        for (const VkExtensionProperties& extensionProperty: deviceExtensionProperties)
-            std::cout << "\t" << extensionProperty.extensionName << ": " << extensionProperty.specVersion << std::endl;
-
-        // get physical device queue family properties
-        uint32_t deviceQueueFamilyPropertiesCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &deviceQueueFamilyPropertiesCount, nullptr);
-        std::vector<VkQueueFamilyProperties> deviceQueueFamilyProperties(deviceQueueFamilyPropertiesCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &deviceQueueFamilyPropertiesCount, deviceQueueFamilyProperties.data());
-        for (const VkQueueFamilyProperties& queueFamilyProperty: deviceQueueFamilyProperties) {
-            std::cout << "\t";
-            std::cout << "VK_QUEUE_GRAPHICS_BIT: "         << ((queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT)         ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_COMPUTE_BIT: "          << ((queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT)          ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_TRANSFER_BIT: "         << ((queueFamilyProperty.queueFlags & VK_QUEUE_TRANSFER_BIT)         ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_SPARSE_BINDING_BIT: "   << ((queueFamilyProperty.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)   ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_VIDEO_DECODE_BIT_KHR: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR) ? "True, " : "False,") << " ";
-            std::cout << "VK_QUEUE_VIDEO_ENCODE_BIT_KHR: " << ((queueFamilyProperty.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR) ? "True  " : "False ") << std::endl;
-        }
-    }
-
     // physical device features
     VkPhysicalDeviceFeatures physicalDeviceFeatures{};
     physicalDeviceFeatures.shaderInt16 = VK_TRUE;
@@ -180,7 +127,7 @@ int main(int argc, char** argv) {
 
     // compile shader
     shaderc_compilation_result_t computeShaderData{};
-    computeShaderData = CompileComputeShader(shadercCompiler, "#version 450\n void main() {}");
+    computeShaderData = CompileComputeShader(shadercCompiler, "#version 450\n uniform layout(set = 0, binding = 0, rgba8ui) readonly  uimage2D inputImage; uniform layout(set = 0, binding = 1, rgba8ui) writeonly uimage2D outputImage; void main() {}");
     assert(computeShaderData);
     // shader module create info
     VkShaderModuleCreateInfo computeShaderModuleCreateInfo{};
@@ -203,13 +150,44 @@ int main(int argc, char** argv) {
     computeShaderStageCreateInfo.pName = "main";
     computeShaderStageCreateInfo.pSpecializationInfo = VK_NULL_HANDLE;
 
+    // descriptor set layout binding
+    VkDescriptorSetLayoutBinding inputImage  { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, 0, VK_NULL_HANDLE };
+    VkDescriptorSetLayoutBinding outputImage { 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, 0, VK_NULL_HANDLE };
+    // descriptor set layout create info
+    VkDescriptorSetLayoutBinding descSetLayoutBindings[] = { inputImage, outputImage };
+    VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo{};
+    descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descSetLayoutCreateInfo.pNext = VK_NULL_HANDLE;
+    descSetLayoutCreateInfo.flags = 0;
+    descSetLayoutCreateInfo.bindingCount = 2;
+    descSetLayoutCreateInfo.pBindings = descSetLayoutBindings;
+    // create descriptor set layout
+    VkDescriptorSetLayout descSetLayout{};
+    vkCreateDescriptorSetLayout(device, &descSetLayoutCreateInfo, VK_NULL_HANDLE, &descSetLayout);
+    assert(descSetLayout);
+
+    // pipeline layout create info
+    VkDescriptorSetLayout descSetLayouts[] { descSetLayout };
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutCreateInfo.pNext = VK_NULL_HANDLE;
+    pipelineLayoutCreateInfo.flags = 0;
+    pipelineLayoutCreateInfo.setLayoutCount = 1;
+    pipelineLayoutCreateInfo.pSetLayouts = descSetLayouts;
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+    pipelineLayoutCreateInfo.pPushConstantRanges = VK_NULL_HANDLE;
+    // create pypeline layout
+    VkPipelineLayout pipelineLayout{};
+    vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, VK_NULL_HANDLE, &pipelineLayout);
+    assert(pipelineLayout);
+
     // compute pipeline create info
     VkComputePipelineCreateInfo pipelineCreateInfo{};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipelineCreateInfo.pNext = VK_NULL_HANDLE;
     pipelineCreateInfo.flags = 0;
     pipelineCreateInfo.stage = computeShaderStageCreateInfo;
-    pipelineCreateInfo.layout; // must be done
+    pipelineCreateInfo.layout = pipelineLayout;
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineCreateInfo.basePipelineIndex = 0;
     // create compute pipeline
@@ -217,8 +195,67 @@ int main(int argc, char** argv) {
     vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, VK_NULL_HANDLE, &computePipeline);
     assert(computePipeline);
 
+    // command pool create info
+    VkCommandPoolCreateInfo commandPoolCreateInfo{};
+    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCreateInfo.pNext = VK_NULL_HANDLE;
+    commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    commandPoolCreateInfo.queueFamilyIndex = 0;
+    // create command pool
+    VkCommandPool commandPool{};
+    vkCreateCommandPool(device, &commandPoolCreateInfo, VK_NULL_HANDLE, &commandPool);
+    assert(commandPool);
+
+    // command buffer allocate info
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.pNext = VK_NULL_HANDLE;
+    commandBufferAllocateInfo.commandPool = commandPool;
+    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocateInfo.commandBufferCount = 1;
+    // create command buffer
+    VkCommandBuffer commandBuffer{};
+    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer);
+    assert(commandBuffer);
+
+    // reset command pool and buffer
+    vkResetCommandPool(device, commandPool, 0);
+    vkResetCommandBuffer(commandBuffer, 0);
+    
+    // begin command buffer
+    VkCommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.pNext = VK_NULL_HANDLE;
+    commandBufferBeginInfo.flags = 0;
+    commandBufferBeginInfo.pInheritanceInfo = VK_NULL_HANDLE;
+    vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+    //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 0, 0, 0, 0);
+    vkCmdDispatch(commandBuffer, 64, 64, 1);
+    vkEndCommandBuffer(commandBuffer);
+
+    // queue submit and wait
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = VK_NULL_HANDLE;
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.pWaitSemaphores = VK_NULL_HANDLE;
+    submitInfo.pWaitDstStageMask = VK_NULL_HANDLE;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.signalSemaphoreCount = 0;
+    submitInfo.pSignalSemaphores = VK_NULL_HANDLE;
+    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(queue);
+
+    // free command buffer and destroy command pool
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    vkDestroyCommandPool(device, commandPool, VK_NULL_HANDLE);
+
     // destroy handles
     vkDestroyPipeline(device, computePipeline, VK_NULL_HANDLE);
+    vkDestroyPipelineLayout(device, pipelineLayout, VK_NULL_HANDLE);
+    vkDestroyDescriptorSetLayout(device, descSetLayout, VK_NULL_HANDLE);
     vkDestroyShaderModule(device, computeShaderModule, VK_NULL_HANDLE);
     shaderc_result_release(computeShaderData);
     shaderc_compiler_release(shadercCompiler);
