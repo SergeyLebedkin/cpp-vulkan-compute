@@ -9,9 +9,12 @@
 const char* computeShader_ImageWrite = R"(
     #version 450
     struct SolidColor { vec4 color; };
+
     layout(set = 0, binding = 0, rgba8ui) uniform readonly  uimage2D inputImage;
     layout(set = 0, binding = 1, rgba8ui) uniform writeonly uimage2D outputImage;
     layout(set = 0, binding = 2, std140)  uniform ubo2 { SolidColor uSolidColor0; };
+
+    layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
     void main() {
         return;
     }
