@@ -142,9 +142,9 @@ int main(int argc, char** argv) {
     allocatorCreateInfo.pHeapSizeLimit = VK_NULL_HANDLE;
     allocatorCreateInfo.instance = instance;
     allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-    VmaAllocator alloactor{};
-    vmaCreateAllocator(&allocatorCreateInfo, &alloactor);
-    assert(alloactor);
+    VmaAllocator allocator{};
+    vmaCreateAllocator(&allocatorCreateInfo, &allocator);
+    assert(allocator);
 
     // get device queue
     VkQueue queue{};
@@ -238,7 +238,7 @@ int main(int argc, char** argv) {
     bufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;
     VmaAllocationCreateInfo allocationCreateInfo{};
     allocationCreateInfo.flags = 0;
-    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
     allocationCreateInfo.requiredFlags = 0;
     allocationCreateInfo.preferredFlags = 0;
     allocationCreateInfo.memoryTypeBits = 0;
@@ -248,7 +248,7 @@ int main(int argc, char** argv) {
     // allocate and create buffer
     VkBuffer buffer{};
     VmaAllocation bufferAllocation{};
-    vmaCreateBuffer(alloactor, &bufferCreateInfo, &allocationCreateInfo, &buffer, &bufferAllocation, VK_NULL_HANDLE);
+    vmaCreateBuffer(allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer, &bufferAllocation, VK_NULL_HANDLE);
     assert(buffer);
     assert(bufferAllocation);
 
@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
     vkDestroyCommandPool(device, commandPool, VK_NULL_HANDLE);
 
     // destroy resource
-    vmaDestroyBuffer(alloactor, buffer, bufferAllocation);
+    vmaDestroyBuffer(allocator, buffer, bufferAllocation);
 
     // destroy handles
     vkDestroyPipeline(device, computePipeline, VK_NULL_HANDLE);
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
     vkDestroyShaderModule(device, computeShaderModule, VK_NULL_HANDLE);
     shaderc_result_release(computeShaderData);
     shaderc_compiler_release(shadercCompiler);
-    vmaDestroyAllocator(alloactor);
+    vmaDestroyAllocator(allocator);
     vkDestroyDevice(device, VK_NULL_HANDLE);
     auto fnDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (fnDestroyDebugUtilsMessengerEXT)
