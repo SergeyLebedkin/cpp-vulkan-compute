@@ -236,6 +236,7 @@ int main(int argc, char** argv) {
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     bufferCreateInfo.queueFamilyIndexCount = 1;
     bufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;
+    // allocation create info
     VmaAllocationCreateInfo allocationCreateInfo{};
     allocationCreateInfo.flags = 0;
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
