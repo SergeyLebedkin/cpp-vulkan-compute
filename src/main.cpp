@@ -245,13 +245,38 @@ int main(int argc, char** argv) {
     allocationCreateInfo.memoryTypeBits = 0;
     allocationCreateInfo.pool = VK_NULL_HANDLE;
     allocationCreateInfo.pUserData = VK_NULL_HANDLE;
-    allocationCreateInfo.priority = 1.0f;
-    // allocate and create buffer
+    allocationCreateInfo.priority = 0.0f;
+    // create and allocate buffer
     VkBuffer buffer{};
     VmaAllocation bufferAllocation{};
     vmaCreateBuffer(allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer, &bufferAllocation, VK_NULL_HANDLE);
     assert(buffer);
     assert(bufferAllocation);
+
+    // image create info
+    VkImageCreateInfo imageCreateInfo{};
+    imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCreateInfo.pNext = VK_NULL_HANDLE;
+    imageCreateInfo.flags = 0;
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageCreateInfo.extent = { 512, 512, 1 };
+    imageCreateInfo.mipLevels = 1;
+    imageCreateInfo.arrayLayers = 1;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageCreateInfo.queueFamilyIndexCount = 1;
+    imageCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    // create and allocate image
+    VkImage image{};
+    VmaAllocation imageAllocation{};
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    vmaCreateImage(allocator, &imageCreateInfo, &allocationCreateInfo, &image, &imageAllocation, VK_NULL_HANDLE);
+    assert(image);
+    assert(imageAllocation);
 
     // command pool create info
     VkCommandPoolCreateInfo commandPoolCreateInfo{};
@@ -310,6 +335,7 @@ int main(int argc, char** argv) {
     vkDestroyCommandPool(device, commandPool, VK_NULL_HANDLE);
 
     // destroy resource
+    vmaDestroyImage(allocator, image, imageAllocation);
     vmaDestroyBuffer(allocator, buffer, bufferAllocation);
 
     // destroy handles
